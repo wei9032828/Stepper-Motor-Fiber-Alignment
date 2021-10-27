@@ -5,6 +5,8 @@ VisualStudioVersion = 16.0.30204.135
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Stepper Alignment", "Stepper Alignment\Stepper Alignment.csproj", "{1C8C107D-510C-4D90-8315-85EFEA6F1D1D}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Test", "..\..\..\..\..\..\..\..\..\source\repos\Test\Test\Test.csproj", "{17B8F5A8-201D-4BE6-8A59-357EA770BDF6}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -15,6 +17,10 @@ Global
 		{1C8C107D-510C-4D90-8315-85EFEA6F1D1D}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{1C8C107D-510C-4D90-8315-85EFEA6F1D1D}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{1C8C107D-510C-4D90-8315-85EFEA6F1D1D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{17B8F5A8-201D-4BE6-8A59-357EA770BDF6}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{17B8F5A8-201D-4BE6-8A59-357EA770BDF6}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{17B8F5A8-201D-4BE6-8A59-357EA770BDF6}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{17B8F5A8-201D-4BE6-8A59-357EA770BDF6}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

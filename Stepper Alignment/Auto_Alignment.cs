@@ -59,17 +59,35 @@ namespace Motor_Encoder
             Directory.CreateDirectory(path + "\\Stepper Station Data");
             logFile = new StreamWriter($"{path}\\Stepper Station Data\\logfile" + DateTime.Now.ToString("MMddHHmm") + ".txt");
         }
-        public void Open_Port(string portName)
+        public bool Open_Port(string portName)
         {
             EZPort.PortName = portName;
             EZPort.BaudRate = 115200;
+            EZPort.ReadTimeout = 5000;
+            EZPort.WriteTimeout = 5000;
             try
             {
+                string return_serial;
                 EZPort.Open();
+                EZPort.DiscardInBuffer();
+                EZPort.DiscardOutBuffer();
+                Thread.Sleep(100);
+                EZPort.WriteLine(Controller.SerialNumber());
+                Thread.Sleep(100);
+
+                return_serial = EZPort.ReadLine();
+                if(return_serial == "")
+                {
+                    ErrorText = "Serial port returns empty string";
+                    EZPort.Close();
+                    return false;
+                }
+                return true;
             }
             catch
             {
                 ErrorText = "Serial port" + EZPort.PortName + "Cannot be opened";
+                return false;
             }
         }
 
@@ -164,16 +182,16 @@ namespace Motor_Encoder
                     // Direction(false)|    True        |      False
                     compensate_Direction = overStep == direction ? false : true;
                 }
-
+                
                 new_count = RunSteps(motor, compensate_Direction, Math.Abs(step_loss));
 
-                //this if is a special case, where we command to go (+) but it goes (-)
+                //this if it is a special case, where we command to go (+) but it goes (-)
                 if ((new_count[motor - 1] - old_count) < 0 && compensate_Direction == true)
                 {
                     step_loss = new_count[motor - 1] - old_count - Math.Abs(step_loss);
                     special_case_dir = true;
                 }
-                //this if is a special case, where we command to go (-) but it goes (+)
+                //this if it is a special case, where we command to go (-) but it goes (+)
                 else if ((new_count[motor - 1] - old_count) > 0 && compensate_Direction == false)
                 {
                     step_loss = new_count[motor - 1] - old_count + Math.Abs(step_loss);
@@ -187,9 +205,10 @@ namespace Motor_Encoder
                     step_loss = Math.Abs(new_count[motor - 1] - old_count) - Math.Abs(step_loss);
                 }
 
-                overStep = step_loss > 0; //Add logic to check, overstep is true only if the step_loss is positive and direction is 
+                overStep = step_loss > 0; //Add logic to check, overstep is true only if the step_loss is positive
 
                 // if step loss is larger than the tolerance, set TRUE to incorrect position
+                //Tolerance is here to speed thigns up, I found it took a long time to correct for 1 step
                 incorrect_Position = Math.Abs(step_loss) > Tolerance;
                 direction = compensate_Direction;
                 old_count = new_count[motor - 1];
@@ -533,19 +552,21 @@ namespace Motor_Encoder
             List<double> loss_Sublist;    //Use to seperate list data from each XY alignment call
             double lossMin;
 
-
+            //Do the XY search right on the spot
             XYAlign(PM1, 3, align_tolerance);
 
             //The while statement doesn't trigger often, usually it is the if statment
             //With break.
             do
             {
-                //get the loop counts, bigger will take more time
+                //get the loop counts, higher value will take more time
                 XY_Loop_Count = FindXY_IterationLoopCount(Loss_Data.Min());
                 lossMin = Loss_Data.Min();
 
                 //Get the current number of count to seperate new loss list from old list
                 Loss_index = Loss_Data.Count();
+                //I don't ever set the close_prox, it is here just in case if you want to implement
+                //the way to control the Z overstepping ratio
                 bool hardStopHit = ZAlign(PM1, productNumber, close_prox);
                 XYAlign(PM1, XY_Loop_Count, align_tolerance);
 
@@ -553,7 +574,8 @@ namespace Motor_Encoder
                 loss_Sublist = Loss_Data.GetRange(Loss_index + 1, Loss_Data.Count() - Loss_index - 1);
 
                 //If loss doesn't improve in the next 2 loops, stop looping X & Y & Z stepping
-                if (loss_Sublist.Min() > lossMin && lossMin < 0.7) not_better += 1;
+                //This only happens when the loss is <2, so it will keep pushing in when the loss is unreasonably high
+                if (loss_Sublist.Min() > lossMin && lossMin < 2) not_better += 1;
                 if (not_better >= 2) break;
 
                 //if time > 1mins and if it will bump into ferrule break!
@@ -574,9 +596,11 @@ namespace Motor_Encoder
 
             Alignment_Minimum = Loss_Data.Min();
             int index = Loss_Data.IndexOf(Alignment_Minimum);
+            //Move to the best X Y Z position based on loss history
             tempEncoderList = MoveToBest(xSteps_Data[index], ySteps_Data[index], zSteps_Data[index],
                 xSteps_Data.Last(), ySteps_Data.Last(), zSteps_Data.Last());
             SaveReadData(tempEncoderList, 0, PM1, "Move to Best");
+            //Do another X Y search just in case if the loss is not at the same place
             XYAlign(PM1, 4, align_tolerance);
             Alignment_Minimum = Loss_Data.Min();
             Console.WriteLine($"Minimum Loss: {Alignment_Minimum}");
@@ -642,6 +666,7 @@ namespace Motor_Encoder
             List<int> tempEncoderList;                           
             int stepSize;
             double tempLoss = GetLoss(PM1);
+            //Save the loss and the motor position
             tempEncoderList = GetCountSaveData(tempLoss);
 
             logFile.WriteLine($"X: {tempEncoderList[0]},Y: " +
@@ -650,12 +675,14 @@ namespace Motor_Encoder
             Console.WriteLine($"Loss: {tempLoss},Time: {stopWatch.Elapsed:mm\\:ss\\:ff}," +
                 $"X: {tempEncoderList[0]},Y: {tempEncoderList[1]},Z: {tempEncoderList[2]}. XY alignment starts");
 
+            //This line will not run when we don't set Alignment_Minimum (default at 0)
+            //After alignment, this can prevent unnecessary XY run since the loss is good
             if (Loss_Data.Last() <= Alignment_Minimum + curing_tol) return true;
 
-            //Find the proper stepsize based on current loss
+            //Find the proper stepsize based on current loss 
             stepSize = FindStepSize(Loss_Data.Last(), productNumber);
 
-            //Limit compelte X+ X- Y+ Y- to (loop_iteration) times, also break if the difference is < 0.005 dB
+            //Limit compelte X+ X- Y+ Y- to (loop_iteration) times
             for (int i = 0; i < loop_iteration; i++)
             {
                 //x positive step first
@@ -713,6 +740,7 @@ namespace Motor_Encoder
             else return false;
         }
 
+        //This will search only in X and Y, it is mainly for sanity check
         public void XY_Search(HPPM PM1, int loopcount)
         {
             Alignment_Minimum = 0;
@@ -736,6 +764,7 @@ namespace Motor_Encoder
             List<int> tempEncoderList;         
             int stepSize;
             double tempLoss = GetLoss(PM1);
+            //save the loss and position data
             tempEncoderList = GetCountSaveData(tempLoss);
 
             logFile.WriteLine($"X: {tempEncoderList[0]},Y: " +
@@ -756,13 +785,14 @@ namespace Motor_Encoder
                 tempEncoderList = Closed_Loop_RunSteps(3, true, stepSize, tempEncoderList);
                 SaveReadData(tempEncoderList, 3, PM1, "Z++");
                 stepSize = FindZStepSize(Loss_Data.Min(), productNumber);
+                //Prevent it to go over the hardstop if it is set
                 if (zSteps_Data.Last() + stepSize > HardStop) return true;
             } while (Loss_Data[Loss_Data.Count - 2] - Loss_Data.Last() > 0);
 
-
+            //This is used to speed things up, purposely moving in Z even though loss is higher
             double overSteppingRatio = ZOverSteppingRatio(Loss_Data.Min(), productNumber, close_prox);
             //To speed things up, we add a multiplier to intentionally overtravel 
-            //We continue to move in +Z direction. Only do this only if ratio is > 1 (product dependent)
+            //We continue to move in +Z direction, only if ratio is > 1 (product dependent)
             while (Loss_Data.Last() <= Loss_Data.Min() * overSteppingRatio)
             {
                 tempEncoderList = Closed_Loop_RunSteps(3, true, stepSize, tempEncoderList);
@@ -770,7 +800,7 @@ namespace Motor_Encoder
                 if (zSteps_Data.Last() + stepSize > HardStop) return true;
             }
 
-            //Step back if loss is low
+            //Step back if loss is low, this is a bit of a hack
             if (Loss_Data.Min() <= 0.8 && z_Step_Iter >= 2)
             {
                 tempEncoderList = Closed_Loop_RunSteps(3, false, stepSize, tempEncoderList);

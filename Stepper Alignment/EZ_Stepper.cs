@@ -15,35 +15,25 @@ namespace Motor_Encoder
         public string Initialize()
         {
             string commandStr;
-            int microSteps = 64;
+            int microSteps = 32;
             int encoderCount_cpr = 2500 * 4;
             int motor_spr = microSteps * 200;
             int aE = 1000 * motor_spr / encoderCount_cpr;
-            commandStr = $"/{BoardNumber}aM1aE{aE}j{microSteps}V{Velocity}m50h35aM2aE{aE}j{microSteps}V{Velocity}m50h35aM3aE{aE}j{microSteps}V{Velocity}m50h35R\r\n";
+            commandStr = $"/{BoardNumber}aM1aE{aE}j{microSteps}V{Velocity}m40h35aM2aE{aE}j{microSteps}V{Velocity}m40h35aM3aE{aE}j{microSteps}V{Velocity}m40h35R\r\n";
             return commandStr;
         }
 
         public string MoveSteps(int motor, bool direction, int steps)
         {
             char rotateDirection = direction ? 'P' : 'D';
-            string commandStr = $"/{BoardNumber}V{Velocity}m50h35aM{motor}{rotateDirection}{steps}R\r\n";
+            string commandStr = $"/{BoardNumber}V{Velocity}m40h35aM{motor}{rotateDirection}{steps}R\r\n";
             return commandStr;
         }
 
-        public string XYMoveSteps(bool xdirection, int xsteps, bool ydirection, int ysteps)
+        public string SerialNumber()
         {
-            string commandStr;
-            char rotateDirection = xdirection ? 'P' : 'D';
-            if (xdirection = ydirection)
-            {
-                commandStr = $"/{BoardNumber}V{Velocity}h35{rotateDirection}{xsteps},{ysteps},,R\r\n";
-                return commandStr;
-            }
-            else
-            {
-                commandStr = $"/{BoardNumber}V{Velocity}h35{rotateDirection}{xsteps},-{ysteps},,R\r\n";
-                return commandStr;
-            }
+            string commandStr = $"/{BoardNumber}&\r\n";
+            return commandStr;
         }
 
 

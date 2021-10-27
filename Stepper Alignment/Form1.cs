@@ -21,7 +21,7 @@ namespace Motor_Encoder
         EZ_Stepper Controller = new EZ_Stepper();
         Auto_Alignment Alignment = new Auto_Alignment();
         private HPPM PM1 = null;
-
+        string path;
         double ref_loss;
 
         public UI_Form()
@@ -30,8 +30,8 @@ namespace Motor_Encoder
             InitPowerMeter();
             LoadChart();
             Disable_Btns();
-            string path = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
-            string reference = File.ReadAllText(@"C:\\Users\\cchang\\Desktop\\Stepper Station Data\\Reference.txt");
+            path = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
+            string reference = File.ReadAllText($"{path}\\Stepper Station Data\\Reference.txt");
             ref_loss = Convert.ToDouble(reference);
             Alignment.ref_loss = ref_loss;
             Product.SelectedIndex = 0;
@@ -41,7 +41,7 @@ namespace Motor_Encoder
             {
                 ComPorts.Items.Add(port);
             }
-            if (ComPorts.Items[0] != null)
+            if (ComPorts.Items.Count != 0)
             {
                 ComPorts.Text = ComPorts.Items[0].ToString();
             }
@@ -112,7 +112,7 @@ namespace Motor_Encoder
         {
             PM1 = new HPPM();
             PM1.Addr = 12;
-            PM1.Slot = 1;
+            PM1.Slot = 2;
             PM1.BoardNumber = 0;
             PM1.Open();
             PM1.init();
@@ -133,10 +133,14 @@ namespace Motor_Encoder
             {
                 try
                 {
-                    Alignment.Open_Port(ComPorts.Text);
-                    Status.Text = "Connected";
-                    Enable_Btns();
-                    Btn_Connect.Text = "Disconnect";
+                    bool success = Alignment.Open_Port(ComPorts.Text);
+                    if (success)
+                    {
+                        Status.Text = "Connected";
+                        Enable_Btns();
+                        Btn_Connect.Text = "Disconnect";
+                    }
+                    else return;
                     
                 }
                 catch
@@ -232,6 +236,7 @@ namespace Motor_Encoder
             Alignment.ySteps_Data.Clear();
             Alignment.zSteps_Data.Clear();
             Alignment.HardStop = Int32.MaxValue;
+            //Moving out a little bit
             Alignment.ClosedLoop_Move(3, -1000);
             Status.Text = "Running Alignment...";
             await Task.Run(() => {
@@ -248,6 +253,8 @@ namespace Motor_Encoder
             Alignment.xSteps_Data.Clear();
             Alignment.ySteps_Data.Clear();
             Alignment.zSteps_Data.Clear();
+            //The hard stop is set here to prevent motor moving in closer than where we are right now
+            //Take this out if you don't want to limit the Z travel
             Alignment.SetHardStop();
             switch (Product.SelectedIndex)
             {
@@ -300,7 +307,7 @@ namespace Motor_Encoder
 
         private void Reference_Click(object sender, EventArgs e)
         {
-            StreamWriter referenceFile = new StreamWriter("C:\\Users\\cchang\\Desktop\\Stepper Station Data\\Reference.txt");
+            StreamWriter referenceFile = new StreamWriter($"{path}\\Stepper Station Data\\Reference.txt");
             double temploss = Math.Round(PM1.ReadPower(), 3);
             referenceFile.WriteLine(temploss);
             referenceFile.Flush();
